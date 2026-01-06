@@ -1,0 +1,27 @@
+[build-system]
+requires = ["flit_core>=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "xpipe"
+readme = "README.md"
+description = ""
+requires-python = ">=3.12"
+dynamic = ["version"]
+dependencies = [
+    "json5>=0.13.0",
+    "loguru>=0.7.3",
+    "networkx>=3.6.1",
+    "numpy<2.4.0",
+    "perfetto>=0.16.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyreadline3>=3.5.4",
+ "pyright>=1.1.408",
+ "pytest>=9.0.2",
+]
+
+[tool.isort]
+profile = "black"
