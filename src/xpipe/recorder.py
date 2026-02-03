@@ -135,11 +135,12 @@ class CatapultRecorder:
             name = op.name
         self._events[op.name] = CompleteEvent(
             name=name,
-            cat=type(op).__name__,
+            cat=op.type,
             ts=op.start_time,
             dur=op.end_time - op.start_time,
             pid=self._proc[cat].pid,
             tid=self._thread[cat].tid,
+            args={k: str(v) for k, v in op.attr.items()},
         )
         self._op2cat[op] = cat
 

@@ -21,7 +21,7 @@ from xpipe.system import Pipeline
 
 
 def _build_graph():
-    mem = MemorySlice("ddr", 1 << 30)
+    mem = MemorySlice("ddr")
     p1 = BasicPipeline("P1")
     p2 = BasicPipeline("P2")
     p3 = BasicPipeline("P3")

@@ -16,41 +16,51 @@ limitations under the License.
 
 from typing import Optional
 
-from ..ir.nbperf import DMAOp, DmaPipeline, DPUOp, DpuPipeline, SHAVEOp
+from ..ir.npu_mlir import DMAOp, DmaPipeline, DPUOp, DpuPipeline, SHAVEOp
 from ..op import BaseOp
 from ..system import Pipeline
 from .cost_model import CostModel
 
 
-class NBPerfMathModel(CostModel):
-    """Mathematical cost model based on static analysis of nbperf IR.
+class MLIRModel(CostModel):
+    """Mathematical cost model based on static analysis of MLIR.
 
-    Note:
+    DMA cost is modeled as:
 
-        # modeling function y=k*x+b for DMA copy compute cycle
-        # y-> compute cycle
-        # x-> data size in bytes
-        modeling_function = {
-            "vpu5": (1.861569e-2, 169.610585),
-            "vpu6": (2.110191e-2, 162.010217),
-            "vpu7": (2.020481e-2, 153.551327),
-        }
+    ..math::
+
+        cost = scale * size / bandwidth
+
+    DPU cost is modeled as:
+
+    ..math::
+
+        cost = scale * op["cost"]  # cost from VPUCostModel
+
+    DSP cost is modeled as a constant.
+
+    Args:
+        dma_scaling (float): scaling factor to DMA cost.
+        dpu_scaling (float): scaling factor to DPU cost.
     """
+
+    def __init__(self, dma_scaling: float = 10, dpu_scaling: float = 10) -> None:
+        self.dma_scaling = dma_scaling
+        self.dpu_scaling = dpu_scaling
 
     def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> float:
         if isinstance(op, DMAOp):
             assert isinstance(pipe, DmaPipeline)
-            # DMA cost model: cost = data_size / bandwidth + offset
-            offset = 0
-            if op.direction in ("DDR2CMX",):
-                offset += 0  # simulate DDR read latency
-            return (op.size / pipe.bandwidth + pipe.overhead) * 1e6 + offset  # unit: us
+            size = op.inputs[0].size
+            scale = self.dma_scaling
+            return (size / pipe.bandwidth + pipe.overhead) * scale * 1e6
         elif isinstance(op, DPUOp):
             assert isinstance(pipe, DpuPipeline)
             # DPU cost model: cost = flops / throughput
-            return (op.mac() / pipe.mac + op.read_latency()) * 1e6  # unit: us
+            scale = self.dpu_scaling
+            return op["cost"] * scale * 1e-3  # us
         elif isinstance(op, SHAVEOp):
             # SHAVE cost model: cost = cycles / frequency
-            return 1
+            return 10
         else:
             raise ValueError(f"Unsupported operation type: {type(op)}")

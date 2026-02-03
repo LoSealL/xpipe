@@ -13,15 +13,56 @@ dependencies = [
     "loguru>=0.7.3",
     "networkx>=3.6.1",
     "numpy<2.4.0",
+    "onnx>=1.20.1",
     "perfetto>=0.16.0",
+    "triton-windows>=3.5.1.post24 ; sys_platform == 'win32'",
+    "triton>=3.5.1 ; sys_platform != 'win32'",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pyreadline3>=3.5.4",
- "pyright>=1.1.408",
- "pytest>=9.0.2",
-]
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchaudio = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
+[dependency-groups]
+dev = ["pyreadline3>=3.5.4", "pyright>=1.1.408", "pytest>=9.0.2"]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/.*", "**/__pycache__", ".venv", "**/node_modules"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+
+[tool.flake8]
+ignore = ["E203", "E231", "E241", "E704"]
+per-file-ignores = ["src/xpipe/ir/nbperf.py:F841,W503"]
+exclude = []
+max-line-length = 88
+max-complexity = 20
+count = true
 
 [tool.isort]
 profile = "black"
+
+[tool.pylint."MAIN"]
+ignore-paths = []
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "logging-fstring-interpolation",
+    "no-member",
+    "no-name-in-module",
+    "fixme",
+    "R",
+    "I",
+]
+
+[tool.mypy]
+disable_error_code = ["assignment", "import-untyped", "return-value", "return"]
+exclude = ['^tests.*\.py$']

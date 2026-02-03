@@ -15,8 +15,9 @@ limitations under the License.
 """
 
 import networkx as nx
+from loguru import logger
 
-from ..ir.graph import OpGraph
+from ..ir.graph import BaseOp, OpGraph
 from ..system import Pipeline, System
 from . import Scheduler
 
@@ -35,7 +36,9 @@ class RoundRobinScheduler(Scheduler):
             dict: A mapping from operator to assigned pipeline.
         """
 
+        end_times = {pipe: 0.0 for pipe in system.pipelines}
         for op in nx.topological_sort(graph):
+            assert isinstance(op, BaseOp)
             best_pipe: Pipeline | None = None
             for pipe in system.pipelines:
                 if not pipe.is_compatible(op):
@@ -43,4 +46,8 @@ class RoundRobinScheduler(Scheduler):
                 if best_pipe is None or len(pipe) < len(best_pipe):
                     best_pipe = pipe
             assert best_pipe is not None
+            op.start_time = end_times[best_pipe]
+            op.end_time = op.start_time + self.get_cost(op, best_pipe)
+            logger.debug(f"schedule {op} on {best_pipe}")
             best_pipe.push(op)
+            end_times[best_pipe] = op.end_time

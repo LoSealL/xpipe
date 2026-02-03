@@ -16,6 +16,7 @@ limitations under the License.
 
 import networkx as nx
 import numpy as np
+from loguru import logger
 
 from ..ir.graph import OpGraph
 from ..op import BaseOp
@@ -51,6 +52,7 @@ class HEFTScheduler(Scheduler):
             assert best_pipe is not None
             op.start_time = best_eft - self.get_cost(op, best_pipe)
             op.end_time = best_eft
+            logger.debug(f"schedule {op} on {best_pipe}")
             best_pipe.push(op)
 
     def ranku(self, system: System, graph: OpGraph):

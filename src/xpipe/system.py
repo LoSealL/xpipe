@@ -17,11 +17,13 @@ limitations under the License.
 import json
 from collections import defaultdict
 from collections.abc import Generator, Sequence
-from heapq import heapify, heappop, heappush
-from typing import Any, Generic, Optional, TypeVar, get_args, get_origin
+from heapq import heappop, heappush
+from typing import Any, Generic, Optional, TypeVar, get_args, get_origin, overload
+
+from loguru import logger
 
 from .executor import BaseExecutor
-from .memory import MemorySlice
+from .memory import MemorySlice, MemorySystem
 from .op import BaseOp
 from .recorder import CatapultRecorder
 
@@ -62,6 +64,11 @@ class Pipeline(Generic[T], metaclass=MetaPipe):
         """Get the allowed operator types for this pipeline."""
 
         return getattr(self, "__allow__", [])
+
+    @property
+    def is_dma(self) -> bool:
+        """Whether this pipeline is for DMA operations."""
+        return False
 
     def push(self, item: T) -> None:
         """Add an operator to the end of the pipeline.
@@ -134,16 +141,30 @@ class System:
 
     Args:
         pipelines (Sequence[Pipeline]): all pipelines that presence in the system.
-        mem_slices (Sequence[MemorySlice]): all memories that presence in the system.
+        mem_slices (MemorySystem): all memories that presence in the system.
     """
 
+    @overload
+    def __init__(
+        self, pipelines: Sequence[Pipeline], mem_slices: MemorySystem
+    ) -> None: ...
+
+    @overload
     def __init__(
         self, pipelines: Sequence[Pipeline], mem_slices: Sequence[MemorySlice]
+    ) -> None: ...
+
+    def __init__(
+        self,
+        pipelines: Sequence[Pipeline],
+        mem_slices: Sequence[MemorySlice] | MemorySystem,
     ):
         self._typed_pipes = defaultdict(list)
         for pipe in pipelines:
             self._typed_pipes[type(pipe)].append(pipe)
-        self._mem_slices = list(mem_slices)
+        if not isinstance(mem_slices, MemorySystem):
+            mem_slices = MemorySystem(mem_slices)
+        self._mem_slices = mem_slices
         self._rec = CatapultRecorder()
 
     @property
@@ -177,14 +198,23 @@ class System:
                 if op := pipe.try_pop(executor):
                     for outp in op.outputs:
                         outp.produce()
-                    for s in self._mem_slices:
-                        self._rec.record_memory_delta(s.name, ts, s.capacity)
+                    for s in self._mem_slices.values():
+                        peak = s.peak
+                        size = s.size
+                        logger.debug(f"{s.name}: peak={peak} size={size} bytes")
+                        self._rec.record_memory_delta(s.name + "_PEAK", ts, peak)
+                        self._rec.record_memory_delta(s.name + "_USED", ts, size)
                     end_time = executor.execute(op)
+                    logger.debug(f"exec {op} on {pipe} from {ts:.2f} to {end_time:.2f}")
                     end_times.add(end_time)
                     for inp in op.inputs:
                         inp.consume()
-                    for s in self._mem_slices:
-                        self._rec.record_memory_delta(s.name, end_time, s.capacity)
+                    for s in self._mem_slices.values():
+                        peak = s.peak
+                        size = s.size
+                        logger.debug(f"{s.name}: peak={peak} size={size} bytes")
+                        self._rec.record_memory_delta(s.name + "_PEAK", end_time, peak)
+                        self._rec.record_memory_delta(s.name + "_USED", end_time, size)
                     self._rec.record(pipe.name, op)
                     for dep in op.deps:
                         self._rec.record_dependency(dep, op)

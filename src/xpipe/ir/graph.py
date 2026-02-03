@@ -14,11 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+from collections.abc import Iterator
 from typing import Any, Generic, Iterable, TypeVar
 
 import networkx as nx
+import onnx
 
 from ..op import BaseOp
+from ..version import version
 
 T = TypeVar("T", bound=BaseOp)
 
@@ -42,6 +45,32 @@ class OpGraph(nx.DiGraph, Generic[T]):
         for u, v, *_ in ebunch_to_add:
             v.deps.add(u)
 
+    def remove_edges_from(
+        self, ebunch: Iterable[tuple | tuple[Any, Any, dict[str, Any]]]
+    ) -> None:
+        super().remove_edges_from(ebunch)
+        for u, v, *_ in ebunch:
+            v.deps.discard(u)
+
+    def remove_edge(self, u: Any, v: Any) -> None:
+        super().remove_edge(u, v)
+        v.deps.discard(u)
+
+    def remove_node(self, n: Any) -> None:
+        for downstream in self.successors(n):
+            downstream.deps.discard(n)
+        super().remove_node(n)
+
+    def remove_nodes_from(self, nodes: Iterable) -> None:
+        for n in nodes:
+            self.remove_node(n)
+
+    def successors(self, n: Any) -> Iterator[T]:
+        yield from super().successors(n)
+
+    def predecessors(self, n: Any) -> Iterator[T]:
+        yield from super().predecessors(n)
+
     def __getitem__(  # pyright: ignore
         self,
         n: str,
@@ -50,3 +79,36 @@ class OpGraph(nx.DiGraph, Generic[T]):
             if node.name == n:
                 return node
         raise KeyError(f"No node named {n} in graph.")
+
+    def __iter__(self) -> Iterator[T]:
+        for node in self.nodes:
+            yield node
+
+    def __contains__(self, n: object) -> bool:
+        if isinstance(n, str):
+            try:
+                _ = self[n]
+                return True
+            except KeyError:
+                return False
+        else:
+            return super().__contains__(n)
+
+    def to_onnx(self) -> onnx.ModelProto:
+        """Convert the graph to ONNX format.
+
+        Returns:
+            onnx.ModelProto: The ONNX representation of the graph.
+        """
+        onnx_nodes = []
+        for node in nx.topological_sort(self):
+            assert isinstance(node, BaseOp)
+            onnx_nodes.append(node.to_onnx())
+        graph = onnx.helper.make_graph(onnx_nodes, self.name, [], [], value_info=[])
+        return onnx.helper.make_model(
+            graph=graph,
+            producer_name="xpipe",
+            producer_version=version,
+            ir_version=onnx.IR_VERSION,
+            opset_imports=[onnx.helper.make_operatorsetid("", 21)],
+        )

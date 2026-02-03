@@ -33,7 +33,7 @@ class BaseExecutor(metaclass=ABCMeta):
 
     @abstractmethod
     def execute(self, op: BaseOp) -> float:
-        """Basicly the latency of the op.
+        """Basically the latency of the op.
 
         Returns:
             int: end time of the operator
@@ -46,7 +46,7 @@ class BaseExecutor(metaclass=ABCMeta):
 
     def step(self, timestamp: float):
         """Step into a new timestamp."""
-        assert timestamp > self._ts
+        assert timestamp >= self._ts
         self._ts = timestamp
 
 

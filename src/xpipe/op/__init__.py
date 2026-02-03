@@ -11,6 +11,8 @@ from abc import ABCMeta
 from collections.abc import Sequence
 from typing import Any
 
+import onnx
+
 from ..memory import Buffer
 
 
@@ -49,6 +51,10 @@ class BaseOp(metaclass=ABCMeta):
         self._end = ts
 
     @property
+    def type(self) -> str:
+        return type(self).__name__
+
+    @property
     def inputs(self):
         return self._inputs
 
@@ -77,3 +83,21 @@ class BaseOp(metaclass=ABCMeta):
         if attr_str:
             attr_str = f"({attr_str})"
         return f"{self.name}[{self.start_time}->{self.end_time}]{attr_str}"
+
+    def to_onnx(self) -> onnx.NodeProto:
+        """Convert the operator to ONNX format.
+
+        Returns:
+            onnx.NodeProto: The ONNX representation of the operator.
+        """
+
+        def _port_name(buf: Buffer) -> str:
+            return f"{buf.loc}{buf.tag}"
+
+        return onnx.helper.make_node(
+            op_type=self.__class__.__name__,
+            inputs=[_port_name(buf) for buf in self.inputs],
+            outputs=[_port_name(buf) for buf in self.outputs],
+            name=self.name,
+            **self.attr,
+        )

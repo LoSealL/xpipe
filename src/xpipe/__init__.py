@@ -15,7 +15,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from .cost import DummyCostModel, NBPerfMathModel, RandomCostModel
+try:
+    import os
+
+    os.environ.setdefault("LOGURU_LEVEL", "INFO")
+except (ImportError, KeyError):
+    pass
+
+from .cost import DummyCostModel, MLIRModel, NBPerfMathModel, RandomCostModel
 from .executor import CostModelExecutor, EasyExecutor
 from .ir.graph import OpGraph
 from .memory import MemorySlice
@@ -23,11 +30,13 @@ from .schedule.heft import HEFTScheduler
 from .schedule.peft import PEFTScheduler
 from .schedule.robin import RoundRobinScheduler
 from .system import BasicPipeline, Pipeline, System
+from .version import version
 
-__version__ = "0.1.0"
+__version__ = version
 
 __all__ = [
     "DummyCostModel",
+    "MLIRModel",
     "NBPerfMathModel",
     "RandomCostModel",
     "CostModelExecutor",

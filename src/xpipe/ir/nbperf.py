@@ -21,7 +21,7 @@ from math import prod
 from types import SimpleNamespace
 from typing import Literal
 
-from ..memory import MemorySlice
+from ..memory import MemorySlice, MemorySystem
 from ..op import BaseOp, Buffer
 from ..system import Pipeline
 from .graph import OpGraph
@@ -35,7 +35,7 @@ class DPUOp(BaseOp):
 
         if self.op_type == "CONV":
             return self._conv_mac()
-        if self.op_type == "MAXPOOL":
+        if self.op_type in ("MAXPOOL", "AVGPOOL"):
             return self._pool_mac()
         if self.op_type == "ADD":
             return self._elewise_mac()
@@ -151,6 +151,10 @@ class DmaPipeline(Pipeline[DMAOp]):
         self.bandwidth = bandwidth
         self.overhead = zero_overhead
 
+    @property
+    def is_dma(self) -> bool:
+        return True
+
 
 class DpuPipeline(Pipeline[DPUOp]):
     """A pipeline consisting of DPU operations.
@@ -176,17 +180,17 @@ class DspPipeline(Pipeline[SHAVEOp]):
         super().__init__(name)
 
 
-def from_nbperf(nb_graph: str | os.PathLike) -> tuple[OpGraph, list[MemorySlice]]:
+def from_nbperf(nb_graph: str | os.PathLike) -> tuple[OpGraph, MemorySystem]:
     """Load an OpGraph from nbperf compiler output IR file."""
 
     with open(nb_graph, encoding="utf-8") as f:
         nbir: dict = json.load(f)
     tasks: list[BaseOp] = []
-    mem_slices: dict[int, MemorySlice] = {}
+    slices: list[MemorySlice] = []
     cmx_clusters = nbir["graph"]["device_meta"]["cmx_clusters"]
-    cmx_size = nbir["graph"]["device_meta"]["cmx_cluster_size"]
     for i in range(cmx_clusters):
-        mem_slices[i] = MemorySlice(name=f"cmx{i}", size=cmx_size)
+        slices.append(MemorySlice(name=f"cmx{i}"))
+    mem_slices = MemorySystem(slices)
     for node in nbir.get("nodes", []):
         node_engine: Literal["DPU", "DMA", "DSP"] = node["engine"]
         node_id: int = node["id"]
@@ -300,4 +304,4 @@ def from_nbperf(nb_graph: str | os.PathLike) -> tuple[OpGraph, list[MemorySlice]
         for u, v in product(producer, consumer):
             graph.add_edge(graph[str(u)], graph[str(v)], barrier_id=bid)
 
-    return graph, list(mem_slices.values())
+    return graph, mem_slices
