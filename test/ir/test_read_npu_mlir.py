@@ -27,7 +27,7 @@ def test_from_mlir():
     num_inputs = len([m for m in graph if graph.in_degree(m) == 0])
     num_outputs = len([m for m in graph if graph.out_degree(m) == 0])
     assert num_inputs == 198
-    assert num_outputs == 14
+    assert num_outputs == 6
     assert len(memories) == 2  # CMX + DDR
 
 

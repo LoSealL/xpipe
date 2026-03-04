@@ -27,8 +27,8 @@ from xpipe import (
     System,
 )
 from xpipe.alloc import GreedyAllocator
-from xpipe.cost import DummyCostModel, MLIRModel, NBPerfMathModel
-from xpipe.ir import nbperf, npu_mlir
+from xpipe.cost import DummyCostModel, MLIRModel, NBPerfMathModel, XeModel
+from xpipe.ir import nbperf, npu_mlir, xe
 
 
 def _parse_args():
@@ -38,6 +38,7 @@ def _parse_args():
     ir = parser.add_mutually_exclusive_group(required=True)
     ir.add_argument("--xpipe", "-x", help="Path to MLIR XPIPE .json file")
     ir.add_argument("--nbperf", "-nb", help="Path to NBPerf .json file")
+    ir.add_argument("--xe", "-xe", help="Path to Xe dumped graph .json file")
     parser.add_argument(
         "--allocator", "-a", choices=["greedy", "vpurt"], default="greedy"
     )
@@ -77,35 +78,46 @@ def _parse_args():
 
 def main() -> None:
     args = _parse_args()
+    dma_bw = args.dma_bandwidth * 1e9  # GB/s to B/s
+    dma_overhead = args.dma_zero_overhead * 1e-6  # us to s
     if args.xpipe:
         graph, mem = npu_mlir.from_mlir(args.xpipe)
-        dma_pipeline = npu_mlir.DmaPipeline
-        dpu_pipeline = npu_mlir.DpuPipeline
-        dsp_pipeline = npu_mlir.DspPipeline
+        dma_pipeline = npu_mlir.DmaPipeline(
+            "dma", bandwidth=dma_bw, zero_overhead=dma_overhead
+        )
+        dpu_pipeline = npu_mlir.DpuPipeline("dpu")
+        dsp_pipeline = npu_mlir.DspPipeline("dsp")
     elif args.nbperf:
         graph, mem = nbperf.from_nbperf(args.nbperf)
-        dma_pipeline = nbperf.DmaPipeline
-        dpu_pipeline = nbperf.DpuPipeline
-        dsp_pipeline = nbperf.DspPipeline
+        dma_pipeline = nbperf.DmaPipeline(
+            "dma", bandwidth=dma_bw, zero_overhead=dma_overhead
+        )
+        dpu_pipeline = nbperf.DpuPipeline("dpu", mac=4096)
+        dsp_pipeline = nbperf.DspPipeline("dsp")
+    elif args.xe:
+        graph, mem = xe.from_xe_graph(args.xe)
+        dma_pipeline = None
+        dpu_pipeline = xe.GpuPipeline("xe")
+        dsp_pipeline = xe.CpuPipeline("cpu")
     else:
         raise RuntimeError
 
-    dma_bw = args.dma_bandwidth * 1e9  # GB/s to B/s
-    dma_overhead = args.dma_zero_overhead * 1e-6  # us to s
-    system = System(
-        [
-            dma_pipeline("dma", bandwidth=dma_bw, zero_overhead=dma_overhead),
-            dpu_pipeline("dpu"),
-            dsp_pipeline("dsp"),
-        ],
-        mem,
-    )
+    pipelines = []
+    if dma_pipeline is not None:
+        pipelines.append(dma_pipeline)
+    if dpu_pipeline is not None:
+        pipelines.append(dpu_pipeline)
+    if dsp_pipeline is not None:
+        pipelines.append(dsp_pipeline)
+    system = System(pipelines, mem)
     if args.dummy_cost_model:
         cost_model = DummyCostModel(1)
     elif args.xpipe:
         cost_model = MLIRModel()
     elif args.nbperf:
         cost_model = NBPerfMathModel()
+    elif args.xe:
+        cost_model = XeModel()
     else:
         raise RuntimeError
 
@@ -120,8 +132,6 @@ def main() -> None:
     if args.allocator == "greedy":
         allocator = GreedyAllocator()
         allocator.alloc(graph)
-    else:
-        raise NotImplementedError(f"Allocator {args.allocator} not implemented")
     endtime = system.run(CostModelExecutor(graph))
     print(f"Total execution time: {endtime:.6f} us")
     args.output_trace.parent.mkdir(parents=True, exist_ok=True)

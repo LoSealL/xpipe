@@ -96,24 +96,25 @@ class MemorySlice:
             raise RuntimeError(f"Memory {mem_id} not allocated on slice {self.name}.")
 
         if mem_id not in self._ref:
-            # Linear scan for the first available gap
-            req_size = self._alloc_map[mem_id].size
-            intervals = []
-            for mid, count in self._ref.items():
-                if count > 0:
-                    b = self._alloc_map[mid]
-                    intervals.append((b.addr, b.addr + b.size))
-            intervals.sort()
+            if self._alloc_map[mem_id].addr < 0:
+                # Linear scan for the first available gap
+                req_size = self._alloc_map[mem_id].size
+                intervals = []
+                for mid, count in self._ref.items():
+                    if count > 0:
+                        b = self._alloc_map[mid]
+                        intervals.append((b.addr, b.addr + b.size))
+                intervals.sort()
 
-            addr = 0
-            for start, end in intervals:
-                if start - addr >= req_size:
-                    break
-                addr = max(addr, end)
+                addr = 0
+                for start, end in intervals:
+                    if start - addr >= req_size:
+                        break
+                    addr = max(addr, end)
 
-            self._alloc_map[mem_id].addr = addr
+                self._alloc_map[mem_id].addr = addr
+                logger.debug(f"[{self.name}] Alloc {req_size} of {mem_id} at {addr}")
             self._ref[mem_id] = 1
-            logger.debug(f"[{self.name}] Alloc {req_size} of {mem_id} at {addr}")
         else:
             self._ref[mem_id] += 1
 

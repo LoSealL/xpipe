@@ -18,6 +18,7 @@ from .cost_model import CostModel
 from .dummy import DummyCostModel, RandomCostModel
 from .mlir import MLIRModel
 from .nbperf import NBPerfMathModel
+from .xe import XeModel
 
 __all__ = [
     "CostModel",
@@ -25,4 +26,5 @@ __all__ = [
     "RandomCostModel",
     "MLIRModel",
     "NBPerfMathModel",
+    "XeModel",
 ]

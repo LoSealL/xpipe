@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from typing import Generic, Optional, TypeVar
+from collections.abc import Sequence
+from typing import Generic, Literal, Optional, TypeVar
 
 from ..op import BaseOp
 from .graph import OpGraph
@@ -138,3 +139,53 @@ def to_dot(graph: OpGraph[BaseOp]) -> str:
             dotdoc += f'  "{op.name}" -> "{succ.name}";\n'
     dotdoc += "}\n"
     return dotdoc
+
+
+def compute_shape_bytes(
+    shape: Sequence[int],
+    dtype: Literal[
+        "f64",
+        "f32",
+        "f16",
+        "f8_e5m2",
+        "f8_e4m3",
+        "i8",
+        "i16",
+        "i32",
+        "i64",
+        "u8",
+        "u16",
+        "u32",
+        "u64",
+    ],
+) -> int:
+    """Compute the total number of bytes for a given shape and data type.
+
+    Args:
+        shape (Sequence[int]): The shape of the tensor.
+        dtype (str): The data type of the tensor (e.g., "f32", "i64").
+
+    Returns:
+        int: The total number of bytes required to store the tensor.
+    """
+    dtype_sizes = {
+        "f32": 4,
+        "f64": 8,
+        "f16": 2,
+        "f8_e5m2": 1,
+        "f8_e4m3": 1,
+        "i8": 1,
+        "i16": 2,
+        "i32": 4,
+        "i64": 8,
+        "u8": 1,
+        "u16": 2,
+        "u32": 4,
+        "u64": 8,
+    }
+    if dtype not in dtype_sizes:
+        raise ValueError(f"Unsupported data type: {dtype}")
+    num_elements = 1
+    for dim in shape:
+        num_elements *= dim
+    return num_elements * dtype_sizes[dtype]

@@ -1,0 +1,513 @@
+{
+  "inputs": [
+    {
+      "id": 2770217992192,
+      "name": "parameter:input.1",
+      "kernels": [
+        "reorder_input_convolution:Conv_0/WithoutBiases_0_split_0"
+      ],
+      "arg_index": [
+        0
+      ],
+      "size": 13824,
+      "shape": [
+        1,
+        3,
+        48,
+        48
+      ],
+      "layout": "bfyx",
+      "dtype": "f16"
+    }
+  ],
+  "outputs": [
+    {
+      "id": 2770219106304,
+      "kernels": [
+        "result:11/sink_port_0_0_split_0"
+      ],
+      "arg_index": [
+        1
+      ],
+      "size": 13824,
+      "shape": [
+        1,
+        3,
+        48,
+        48
+      ],
+      "layout": "bfyx",
+      "dtype": "f16"
+    }
+  ],
+  "constants": [
+    {
+      "id": 18446664917462548480,
+      "size": 31104,
+      "offset": 0,
+      "type": "gpu_usm"
+    },
+    {
+      "id": 2770217861120,
+      "size": 128,
+      "offset": 31104,
+      "type": "gpu_usm"
+    },
+    {
+      "id": 18446664917462351872,
+      "size": 102400,
+      "offset": 31232,
+      "type": "gpu_usm"
+    },
+    {
+      "id": 2770218057728,
+      "size": 64,
+      "offset": 133632,
+      "type": "gpu_usm"
+    },
+    {
+      "id": 18446664917462482944,
+      "size": 51200,
+      "offset": 147520,
+      "type": "gpu_usm"
+    },
+    {
+      "id": 2770218188800,
+      "size": 6,
+      "offset": 198720,
+      "type": "gpu_usm"
+    }
+  ],
+  "variants": [
+    {
+      "id": 18446664917463203840,
+      "size": 18816
+    },
+    {
+      "id": 18446664917462614016,
+      "size": 346112
+    },
+    {
+      "id": 18446664917463007232,
+      "size": 173056
+    }
+  ],
+  "kernels": [
+    {
+      "input": true,
+      "input_name": "parameter:input.1",
+      "output": false,
+      "id": "reorder_input_convolution:Conv_0/WithoutBiases",
+      "unique_id": "reorder_input_convolution:Conv_0/WithoutBiases_0_split_0",
+      "entry": "reorder_data_fast_b1_9130341625979583104_0_0",
+      "domain": null,
+      "group_size": [
+        216,
+        1,
+        1
+      ],
+      "local_size": [
+        32,
+        1,
+        1
+      ],
+      "arguments": [
+        {
+          "mem_id": 2770217992192,
+          "type": "INPUT",
+          "dtype": "f16",
+          "shape": [
+            1,
+            3,
+            48,
+            48
+          ],
+          "is_input": true,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_host",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 18446664917463203840,
+          "type": "OUTPUT",
+          "dtype": "f16",
+          "shape": [
+            1,
+            3,
+            48,
+            48
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        }
+      ],
+      "depends": [],
+      "barrier": false,
+      "output_layouts": [
+        "bfyx"
+      ]
+    },
+    {
+      "input": false,
+      "input_name": "",
+      "output": false,
+      "id": "convolution:Conv_0/WithoutBiases",
+      "unique_id": "convolution:Conv_0/WithoutBiases_0_split_0",
+      "entry": "convolution_gpu_bfyx_os_iyx_osv32_5596476170970556257_0_0",
+      "domain": null,
+      "group_size": [
+        12,
+        12,
+        2
+      ],
+      "local_size": [
+        1,
+        1,
+        16
+      ],
+      "arguments": [
+        {
+          "mem_id": 18446664917463203840,
+          "type": "INPUT",
+          "dtype": "f16",
+          "shape": [
+            1,
+            3,
+            48,
+            48
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 18446664917462614016,
+          "type": "OUTPUT",
+          "dtype": "f16",
+          "shape": [
+            1,
+            64,
+            48,
+            48
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 18446664917462548480,
+          "type": "WEIGHTS",
+          "dtype": "f16",
+          "shape": [
+            64,
+            3,
+            9,
+            9
+          ],
+          "is_input": false,
+          "layout": "os_iyx_osv32",
+          "block": {
+            "block_sizes": [
+              32
+            ],
+            "block_idx": [
+              0
+            ],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 2770217861120,
+          "type": "BIAS",
+          "dtype": "f16",
+          "shape": [
+            1,
+            64,
+            1,
+            1
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_host",
+          "alias_offset": 0
+        }
+      ],
+      "depends": [
+        "reorder_input_convolution:Conv_0/WithoutBiases"
+      ],
+      "barrier": true,
+      "output_layouts": [
+        "bfyx"
+      ]
+    },
+    {
+      "input": false,
+      "input_name": "",
+      "output": false,
+      "id": "convolution:Conv_2/WithoutBiases",
+      "unique_id": "convolution:Conv_2/WithoutBiases_0_split_0",
+      "entry": "convolution_gpu_bfyx_os_iyx_osv32_14989157898063826992_0_0",
+      "domain": null,
+      "group_size": [
+        12,
+        12,
+        1
+      ],
+      "local_size": [
+        1,
+        1,
+        16
+      ],
+      "arguments": [
+        {
+          "mem_id": 18446664917462614016,
+          "type": "INPUT",
+          "dtype": "f16",
+          "shape": [
+            1,
+            64,
+            48,
+            48
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 18446664917463007232,
+          "type": "OUTPUT",
+          "dtype": "f16",
+          "shape": [
+            1,
+            32,
+            48,
+            48
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 18446664917462351872,
+          "type": "WEIGHTS",
+          "dtype": "f16",
+          "shape": [
+            32,
+            64,
+            5,
+            5
+          ],
+          "is_input": false,
+          "layout": "os_iyx_osv32",
+          "block": {
+            "block_sizes": [
+              32
+            ],
+            "block_idx": [
+              0
+            ],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 2770218057728,
+          "type": "BIAS",
+          "dtype": "f16",
+          "shape": [
+            1,
+            32,
+            1,
+            1
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_host",
+          "alias_offset": 0
+        }
+      ],
+      "depends": [
+        "convolution:Conv_0/WithoutBiases"
+      ],
+      "barrier": true,
+      "output_layouts": [
+        "bfyx"
+      ]
+    },
+    {
+      "input": false,
+      "input_name": "",
+      "output": true,
+      "id": "result:11/sink_port_0",
+      "unique_id": "result:11/sink_port_0_0_split_0",
+      "entry": "convolution_gpu_bfyx_os_iyx_osv32_12659942716310923824_0_0",
+      "domain": null,
+      "group_size": [
+        12,
+        12,
+        1
+      ],
+      "local_size": [
+        1,
+        1,
+        16
+      ],
+      "arguments": [
+        {
+          "mem_id": 18446664917463007232,
+          "type": "INPUT",
+          "dtype": "f16",
+          "shape": [
+            1,
+            32,
+            48,
+            48
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 2770219106304,
+          "type": "OUTPUT",
+          "dtype": "f16",
+          "shape": [
+            1,
+            3,
+            48,
+            48
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_host",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 18446664917462482944,
+          "type": "WEIGHTS",
+          "dtype": "f16",
+          "shape": [
+            3,
+            32,
+            5,
+            5
+          ],
+          "is_input": false,
+          "layout": "os_iyx_osv32",
+          "block": {
+            "block_sizes": [
+              32
+            ],
+            "block_idx": [
+              0
+            ],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_device",
+          "alias_offset": 0
+        },
+        {
+          "mem_id": 2770218188800,
+          "type": "BIAS",
+          "dtype": "f16",
+          "shape": [
+            1,
+            3,
+            1,
+            1
+          ],
+          "is_input": false,
+          "layout": "bfyx",
+          "block": {
+            "block_sizes": [],
+            "block_idx": [],
+            "strides": []
+          },
+          "memory_type": "gpu_usm",
+          "allocation_type": "usm_host",
+          "alias_offset": 0
+        }
+      ],
+      "depends": [
+        "convolution:Conv_2/WithoutBiases"
+      ],
+      "barrier": true,
+      "output_layouts": [
+        "bfyx"
+      ]
+    }
+  ]
+}
