@@ -81,6 +81,15 @@ class MemorySlice:
         self._ref: dict[int, int] = {}
         self._strict = strict
 
+    def clear(self):
+        """Clear all buffers on this slice."""
+        self._alloc_map.clear()
+        self._ref.clear()
+
+    def reset(self):
+        """Reset the memory slice by clearing all allocated buffers."""
+        self._ref.clear()
+
     def placeholder(self, mem_id: int, addr: int, size: int) -> Buffer:
         """Get or create a buffer that will occupy a space on this slice."""
 
@@ -204,3 +213,8 @@ class MemorySystem(dict[str, MemorySlice]):
             assert False, "Unreachable"
         else:
             return super().__getitem__(key)
+
+    def reset(self):
+        """Reset the memory system by clearing all allocated buffers."""
+        for mem in self.values():
+            mem.reset()

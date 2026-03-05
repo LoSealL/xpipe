@@ -124,6 +124,14 @@ class CatapultRecorder:
                 args={"name": cat + "_thread"},
             )
 
+    def reset(self):
+        """Reset the recorder by clearing all recorded events and metadata."""
+
+        self._events.clear()
+        self._proc.clear()
+        self._thread.clear()
+        self._op2cat.clear()
+
     def record(self, cat: str, op: BaseOp):
         """Record the begin and end event (which combines a complete event)
         on the op."""

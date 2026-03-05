@@ -17,6 +17,7 @@ limitations under the License.
 import json
 from collections import defaultdict
 from collections.abc import Generator, Sequence
+from copy import deepcopy, copy
 from heapq import heappop, heappush
 from typing import Any, Generic, Optional, TypeVar, get_args, get_origin, overload
 
@@ -116,6 +117,14 @@ class Pipeline(Generic[T], metaclass=MetaPipe):
         else:
             return None
 
+    def clone(self) -> "Pipeline[T]":
+        """Create a deep copy of the pipeline."""
+
+        new_pipe = self.__class__(self.name)
+        for i in self:
+            new_pipe.push(i)
+        return new_pipe
+
     def __getitem__(self, index: int) -> T:
         return self._buck[index]
 
@@ -169,6 +178,7 @@ class System:
 
     @property
     def pipelines(self) -> Generator[Pipeline[BaseOp], None, None]:
+        """Get all pipelines in the system."""
         for pipes in self._typed_pipes.values():
             for p in pipes:
                 yield p
@@ -188,13 +198,34 @@ class System:
         raise KeyError(f"Pipeline named {key} not found in the system.")
 
     def run(self, executor: BaseExecutor) -> float:
-        next_timestamp: list[float] = [0]
+        """Simulate all operations from pipelines by the given executor,
+        and return the total execution time.
+
+        Args:
+            executor (BaseExecutor): An executor to simulate the execution.
+
+        Returns:
+            float: the total execution time (in microseconds).
+        """
         last_end_time = -1
+        for _, end_time in self.step(executor):
+            last_end_time = max(last_end_time, end_time)
+        return last_end_time
+
+    def step(
+        self, executor: BaseExecutor
+    ) -> Generator[tuple[BaseOp, float], None, None]:
+        """Perform a single step of execution by the given executor, and yield the
+        executed operator and its end time."""
+        self._mem_slices.reset()
+        self._rec.reset()
+        pipelines = [p.clone() for p in self.pipelines]
+        next_timestamp: list[float] = [0]
         while len(next_timestamp) > 0:
             ts = heappop(next_timestamp)
             executor.step(ts)
             end_times: set[float] = set()
-            for pipe in self.pipelines:
+            for pipe in pipelines:
                 if op := pipe.try_pop(executor):
                     for outp in op.outputs:
                         outp.produce()
@@ -218,14 +249,15 @@ class System:
                     self._rec.record(pipe.name, op)
                     for dep in op.deps:
                         self._rec.record_dependency(dep, op)
+                    yield op, end_time
             if not end_times:
                 continue
             for end_time in end_times:
                 heappush(next_timestamp, end_time)
-            last_end_time = max(last_end_time, *end_times)
-        return last_end_time
 
     def dump(self, filepath: str = "trace.json") -> None:
+        """Dump the execution trace recorded by the system to a JSON file."""
+
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(self._rec.to_json(), f, indent=4)
 
