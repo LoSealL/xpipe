@@ -48,15 +48,15 @@ def _parse_args():
     parser.add_argument(
         "--dma-bandwidth",
         "-bw",
-        type=float,
-        default=64.0,
-        help="DMA bandwidth in GB/s",
+        type=int,
+        default=64,
+        help="DMA bandwidth in B/cycle",
     )
     parser.add_argument(
         "--dma-zero-overhead",
-        type=float,
-        default=1.0,
-        help="DMA overhead in useconds when transferring zero bytes",
+        type=int,
+        default=1000,
+        help="DMA overhead in cycles when transferring zero bytes",
     )
     parser.add_argument(
         "--dummy-cost-model", action="store_true", help="Use a dummy cost model"
@@ -78,8 +78,8 @@ def _parse_args():
 
 def main() -> None:
     args = _parse_args()
-    dma_bw = args.dma_bandwidth * 1e9  # GB/s to B/s
-    dma_overhead = args.dma_zero_overhead * 1e-6  # us to s
+    dma_bw = args.dma_bandwidth  # B/cycle
+    dma_overhead = args.dma_zero_overhead  # cycles
     if args.xpipe:
         graph, mem = npu_mlir.from_mlir(args.xpipe)
         dma_pipeline = npu_mlir.DmaPipeline(
@@ -134,6 +134,7 @@ def main() -> None:
         allocator.alloc(graph)
     endtime = system.run(CostModelExecutor(graph))
     print(f"Total execution time: {endtime:.6f} us")
+    # system.replay()
     args.output_trace.parent.mkdir(parents=True, exist_ok=True)
     system.dump(args.output_trace.with_suffix(".json"))
 

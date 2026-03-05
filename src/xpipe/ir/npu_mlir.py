@@ -54,13 +54,11 @@ class DmaPipeline(Pipeline[DMAOp]):
 
     Args:
         name (str): The name of the pipeline.
-        bandwidth (float): The bandwidth of the DMA pipeline in bytes/s.
-        zero_overhead (float): The fixed overhead time in s for each DMA operation.
+        bandwidth (int): The transaction byte per cycle of the DMA pipeline.
+        zero_overhead (int): The fixed overhead time in cycles for each DMA operation.
     """
 
-    def __init__(
-        self, name: str = "dma", bandwidth: float = 1, zero_overhead: float = 0
-    ):
+    def __init__(self, name: str = "dma", bandwidth: int = 1, zero_overhead: int = 0):
         super().__init__(name)
         self.bandwidth = bandwidth
         self.overhead = zero_overhead
@@ -75,10 +73,10 @@ class DpuPipeline(Pipeline[DPUOp]):
 
     Args:
         name (str): The name of the pipeline.
-        mac (float): The number of MAC operations per second.
+        mac (int): The number of MAC operations per cycle.
     """
 
-    def __init__(self, name: str = "dpu", mac: float = 1):
+    def __init__(self, name: str = "dpu", mac: int = 4096):
         super().__init__(name)
         self.mac = mac
 
@@ -283,6 +281,10 @@ def from_mlir(
             op = SHAVEOp(op_name, op_inputs, op_outputs)
         else:
             raise RuntimeError(f"Unsupported op type: {op_type}")
+        for i in op_inputs:
+            i.consumers.append(op)
+        for i in op_outputs:
+            i.producers.append(op)
         assert op not in graph
         graph.add_node(op)
         for pred in mlir_dag.predecessors(graph_node):

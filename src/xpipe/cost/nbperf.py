@@ -37,18 +37,18 @@ class NBPerfMathModel(CostModel):
         }
     """
 
-    def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> float:
+    def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> int:
         if isinstance(op, DMAOp):
             assert isinstance(pipe, DmaPipeline)
             # DMA cost model: cost = data_size / bandwidth + offset
             offset = 0
             if op.direction in ("DDR2CMX",):
                 offset += 0  # simulate DDR read latency
-            return (op.size / pipe.bandwidth + pipe.overhead) * 1e6 + offset  # unit: us
+            return (op.size + pipe.bandwidth - 1) // pipe.bandwidth + pipe.overhead
         elif isinstance(op, DPUOp):
             assert isinstance(pipe, DpuPipeline)
             # DPU cost model: cost = flops / throughput
-            return (op.mac() / pipe.mac + op.read_latency()) * 1e6  # unit: us
+            return (op.mac() + pipe.mac - 1) // pipe.mac + op.read_latency()
         elif isinstance(op, SHAVEOp):
             # SHAVE cost model: cost = cycles / frequency
             return 1

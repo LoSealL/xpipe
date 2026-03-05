@@ -27,14 +27,14 @@ class Scheduler(metaclass=ABCMeta):
 
     def __init__(self, cost_model: CostModel):
         self.cost_model = cost_model
-        self.op_costs: dict[tuple[BaseOp, Pipeline], float] = {}
+        self.op_costs: dict[tuple[BaseOp, Pipeline], int] = {}
 
-    def get_cost(self, op: BaseOp, pipe: Pipeline) -> float:
+    def get_cost(self, op: BaseOp, pipe: Pipeline) -> int:
         """Get and cache the cost of an operator."""
 
         if (op, pipe) in self.op_costs:
             return self.op_costs[(op, pipe)]
-        cost = self.cost_model(op, pipe=pipe)
+        cost = self.cost_model.cost(op, pipe=pipe)
         self.op_costs[(op, pipe)] = cost
         return cost
 

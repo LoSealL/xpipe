@@ -27,6 +27,7 @@ class Interval(TypedDict):
     buf: NotRequired[Buffer]
     loc: str
     size: int
+    prod_starts: list[float]
     prod_ends: list[float]
     cons_starts: list[float]
     cons_ends: list[float]
@@ -57,20 +58,25 @@ class GreedyAllocator:
             lambda: Interval(
                 loc="",
                 size=0,
+                prod_starts=[],
                 prod_ends=[],
                 cons_starts=[],
                 cons_ends=[],
             )
         )
 
+        graph_end = 0.0
+
         for op in graph:
+            graph_end = max(graph_end, float(op.end_cycle))
             for buf in op.outputs:
                 key = (buf.loc, buf.tag)
                 info = by_buf[key]
                 info["buf"] = buf
                 info["loc"] = buf.loc
                 info["size"] = max(info["size"], int(buf.size))
-                info["prod_ends"].append(float(op.end_time))
+                info["prod_starts"].append(float(op.start_cycle))
+                info["prod_ends"].append(float(op.end_cycle))
 
             for buf in op.inputs:
                 key = (buf.loc, buf.tag)
@@ -78,13 +84,14 @@ class GreedyAllocator:
                 info["buf"] = buf
                 info["loc"] = buf.loc
                 info["size"] = max(info["size"], int(buf.size))
-                info["cons_starts"].append(float(op.start_time))
-                info["cons_ends"].append(float(op.end_time))
+                info["cons_starts"].append(float(op.start_cycle))
+                info["cons_ends"].append(float(op.end_cycle))
 
         intervals_by_loc: dict[str, list[tuple[float, float, Buffer, int]]] = (
             defaultdict(list)
         )
         for info in by_buf.values():
+            prod_starts = info["prod_starts"]
             prod_ends = info["prod_ends"]
             cons_starts = info["cons_starts"]
             cons_ends = info["cons_ends"]
@@ -92,8 +99,8 @@ class GreedyAllocator:
             assert "buf" in info
             buf = info["buf"]
 
-            if prod_ends:
-                start = min(prod_ends)
+            if prod_starts:
+                start = min(prod_starts)
             elif cons_starts:
                 start = min(cons_starts)
             else:

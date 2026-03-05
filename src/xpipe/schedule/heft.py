@@ -50,8 +50,8 @@ class HEFTScheduler(Scheduler):
                     best_eft = eft
                     best_pipe = pipe
             assert best_pipe is not None
-            op.start_time = best_eft - self.get_cost(op, best_pipe)
-            op.end_time = best_eft
+            op.start_cycle = int(best_eft - self.get_cost(op, best_pipe))
+            op.end_cycle = int(best_eft)
             logger.debug(f"schedule {op} on {best_pipe}")
             best_pipe.push(op)
 
@@ -81,7 +81,7 @@ class HEFTScheduler(Scheduler):
                 )
             op["rank"] = ranku
 
-    def est(self, op: BaseOp, pipe: Pipeline, graph: OpGraph) -> float:
+    def est(self, op: BaseOp, pipe: Pipeline, graph: OpGraph) -> int:
         """Compute the Earliest Start Time (EST) of an operator on a given pipeline.
 
         Args:
@@ -90,14 +90,14 @@ class HEFTScheduler(Scheduler):
             graph (OpGraph): The operator graph.
 
         Returns:
-            float: The earliest start time of the operator on the pipeline.
+            int: The earliest start time of the operator on the pipeline.
         """
 
         # earliest start time from all predecessors
-        ests = [0.0]
+        ests: list[int] = [0]
         for dep in op.deps:
             comm = graph.get_edge_data(dep, op, {}).get("comm", 0)
-            ests.append(dep.end_time + (comm if dep not in pipe else 0))
+            ests.append(dep.end_cycle + (comm if dep not in pipe else 0))
         est = max(ests)
         free_times: list[tuple[float, float]] = []
         if len(pipe) == 0:
@@ -106,12 +106,12 @@ class HEFTScheduler(Scheduler):
             # find all free time slots in the pipeline
             prev_end = 0
             for scheduled_op in pipe:
-                if scheduled_op.start_time > prev_end:
-                    free_times.append((prev_end, scheduled_op.start_time))
-                prev_end = scheduled_op.end_time
+                if scheduled_op.start_cycle > prev_end:
+                    free_times.append((prev_end, scheduled_op.start_cycle))
+                prev_end = scheduled_op.end_cycle
             free_times.append((prev_end, float("inf")))
         # find the earliest free time slot that can fit the op
         for beg, end in free_times:
             if end - max(beg, est) >= self.get_cost(op, pipe):
-                return max(beg, est)
+                return int(max(beg, est))
         return est

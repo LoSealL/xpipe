@@ -210,7 +210,7 @@ def from_xe_graph(
             "input": bool(kernel.get("input", False)),
             "output": bool(kernel.get("output", False)),
             "input_name": kernel.get("input_name", ""),
-            "cost": kernel.get("cost", 1),
+            "cost": kernel.get("cost", 1000),
         }
         op = XeOp(op_name, op_inputs, op_outputs, **attrs)
         graph.add_node(op)

@@ -17,7 +17,6 @@ limitations under the License.
 import json
 from collections import defaultdict
 from collections.abc import Generator, Sequence
-from copy import deepcopy, copy
 from heapq import heappop, heappush
 from typing import Any, Generic, Optional, TypeVar, get_args, get_origin, overload
 
@@ -85,11 +84,11 @@ class Pipeline(Generic[T], metaclass=MetaPipe):
                     f"Pipeline {self.name} only allows to push operator of class or "
                     f"subclass of {t.__name__}, but got {type(item).__name__}."
                 )
-        if hasattr(item, "end_time") and item.end_time != float("inf"):
-            assert hasattr(item, "start_time")
-            # insert item to keep the pipeline ordered by start_time
+        if hasattr(item, "end_cycle") and item.end_cycle != float("inf"):
+            assert hasattr(item, "start_cycle")
+            # insert item to keep the pipeline ordered by start_cycle
             for i, op in enumerate(self._buck):
-                if item.start_time < op.start_time:
+                if item.start_cycle < op.start_cycle:
                     self._buck.insert(i, item)
                     return
         self._buck.append(item)
@@ -205,29 +204,40 @@ class System:
             executor (BaseExecutor): An executor to simulate the execution.
 
         Returns:
-            float: the total execution time (in microseconds).
+            int: the total execution time (in microseconds).
         """
         last_end_time = -1
         for _, end_time in self.step(executor):
             last_end_time = max(last_end_time, end_time)
         return last_end_time
 
-    def step(
-        self, executor: BaseExecutor
-    ) -> Generator[tuple[BaseOp, float], None, None]:
+    def step(self, executor: BaseExecutor) -> Generator[tuple[BaseOp, int], None, None]:
         """Perform a single step of execution by the given executor, and yield the
         executed operator and its end time."""
         self._mem_slices.reset()
         self._rec.reset()
         pipelines = [p.clone() for p in self.pipelines]
-        next_timestamp: list[float] = [0]
+        next_timestamp: list[int] = [0]
+        end_times: dict[int, list[BaseOp]] = defaultdict(list)
         while len(next_timestamp) > 0:
             ts = heappop(next_timestamp)
             executor.step(ts)
-            end_times: set[float] = set()
+            op_times: list[tuple[BaseOp, int, int]] = []
+            if ts in end_times:
+                for end_op in end_times.pop(ts):
+                    for inp in end_op.inputs:
+                        logger.debug(f"consume {inp.tag} by {end_op.name}")
+                        inp.consume()
+                    for s in self._mem_slices.values():
+                        peak = s.peak
+                        size = s.size
+                        logger.debug(f"{s.name}: peak={peak} size={size} bytes")
+                        self._rec.record_memory_delta(s.name + "_PEAK", ts, peak)
+                        self._rec.record_memory_delta(s.name + "_USED", ts, size)
             for pipe in pipelines:
                 if op := pipe.try_pop(executor):
                     for outp in op.outputs:
+                        logger.debug(f"produce {outp.tag} by {op.name}")
                         outp.produce()
                     for s in self._mem_slices.values():
                         peak = s.peak
@@ -236,23 +246,17 @@ class System:
                         self._rec.record_memory_delta(s.name + "_PEAK", ts, peak)
                         self._rec.record_memory_delta(s.name + "_USED", ts, size)
                     end_time = executor.execute(op)
-                    logger.debug(f"exec {op} on {pipe} from {ts:.2f} to {end_time:.2f}")
-                    end_times.add(end_time)
-                    for inp in op.inputs:
-                        inp.consume()
-                    for s in self._mem_slices.values():
-                        peak = s.peak
-                        size = s.size
-                        logger.debug(f"{s.name}: peak={peak} size={size} bytes")
-                        self._rec.record_memory_delta(s.name + "_PEAK", end_time, peak)
-                        self._rec.record_memory_delta(s.name + "_USED", end_time, size)
+                    assert op.start_cycle == ts
+                    op_times.append((op, ts, end_time))
+                    end_times[end_time].append(op)
+                    logger.debug(f"exec {op} on {pipe} from {ts} to {end_time}")
                     self._rec.record(pipe.name, op)
                     for dep in op.deps:
                         self._rec.record_dependency(dep, op)
                     yield op, end_time
-            if not end_times:
+            if not op_times:
                 continue
-            for end_time in end_times:
+            for end_time in set(i[-1] for i in op_times):
                 heappush(next_timestamp, end_time)
 
     def dump(self, filepath: str = "trace.json") -> None:

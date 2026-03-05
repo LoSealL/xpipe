@@ -16,7 +16,7 @@ limitations under the License.
 
 from typing import Optional
 
-from ..ir.xe import XeOp, CpuOp, GpuPipeline, CpuPipeline
+from ..ir.xe import CpuOp, CpuPipeline, GpuPipeline, XeOp
 from ..op import BaseOp
 from ..system import Pipeline
 from .cost_model import CostModel
@@ -44,18 +44,16 @@ class XeModel(CostModel):
         cpu_scaling (float): scaling factor to CPU cost.
     """
 
-    def __init__(self, gpu_scaling: float = 10, cpu_scaling: float = 10) -> None:
-        self.gpu_scaling = gpu_scaling
-        self.cpu_scaling = cpu_scaling
+    def __init__(self, gpu_freq: float = 2e9, cpu_freq: float = 2e9) -> None:
+        self.gpu_freq = gpu_freq / 1e6  # MHz
+        self.cpu_freq = cpu_freq / 1e6
 
-    def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> float:
+    def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> int:
         if isinstance(op, XeOp):
             assert isinstance(pipe, GpuPipeline)
-            scale = self.gpu_scaling
-            return op["cost"] * scale * 1e-3  # us
+            return int(op["cost"] * self.gpu_freq)
         elif isinstance(op, CpuOp):
             assert isinstance(pipe, CpuPipeline)
-            scale = self.cpu_scaling
-            return op["cost"] * scale * 1e-3  # us
+            return int(op["cost"] * self.cpu_freq)
         else:
             raise ValueError(f"Unsupported operation type: {type(op)}")

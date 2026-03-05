@@ -16,9 +16,12 @@ limitations under the License.
 
 import weakref
 from collections.abc import Sequence
-from typing import overload
+from typing import TYPE_CHECKING, overload
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from .op import BaseOp
 
 
 class Buffer:
@@ -38,6 +41,9 @@ class Buffer:
         self._size = size
         self._slice = weakref.proxy(memory_slice)
         self.addr = addr
+        self.producers: list[BaseOp] = []
+        self.consumers: list[BaseOp] = []
+        self._remaining_uses = -1
 
     @property
     def tag(self) -> int:
@@ -51,12 +57,23 @@ class Buffer:
     def loc(self) -> str:
         return self._slice.name
 
+    @property
+    def live_range(self) -> tuple[int, int]:
+        """Get the live range of this buffer as a tuple of (start, end) timestamps."""
+        if len(self.producers) == 0 or len(self.consumers) == 0:
+            raise RuntimeError(f"Buffer {self.tag} has no producer or consumer.")
+        start = min(op.start_cycle for op in self.producers)
+        end = max(op.end_cycle for op in self.consumers)
+        return start, end
+
     def consume(self):
         """Mark that this buffer has been consumed.
 
         This method will decrease the reference on the slice.
         """
-        self._slice.free(self._tag)
+        self._remaining_uses -= 1
+        if self._remaining_uses == 0:
+            self._slice.free(self._tag)
 
     def produce(self):
         """Mark that this buffer will be used.
@@ -64,6 +81,8 @@ class Buffer:
         This method will increase the reference on the slice.
         """
 
+        if self._remaining_uses == -1:
+            self._remaining_uses = len(self.consumers)
         self._slice.malloc(self._tag)
 
 
@@ -123,17 +142,16 @@ class MemorySlice:
 
                 self._alloc_map[mem_id].addr = addr
                 logger.debug(f"[{self.name}] Alloc {req_size} of {mem_id} at {addr}")
+            logger.debug(f"[{self.name}] Alloc {mem_id}")
             self._ref[mem_id] = 1
-        else:
-            self._ref[mem_id] += 1
 
     def free(self, mem_id: int):
         """Decrease reference count on the buffer."""
 
-        if mem_id in self._ref and self._ref[mem_id] > 0:
-            self._ref[mem_id] -= 1
-            if self._ref[mem_id] == 0:
-                logger.debug(f"[{self.name}] Free {mem_id}")
+        if mem_id in self._ref:
+            logger.debug(f"[{self.name}] Free {mem_id}")
+            self._ref[mem_id] = 0
+            if self._strict:
                 del self._ref[mem_id]
         elif self._strict:
             raise RuntimeError(f"Freeing unallocated memory {mem_id}.")
@@ -169,7 +187,7 @@ class MemorySlice:
     def capacity(self) -> int:
         """Get total capacity of the memory slice."""
 
-        return sum(mem.size for mem in self._alloc_map.values())
+        return max(mem.addr + mem.size for mem in self._alloc_map.values())
 
     def __repr__(self) -> str:
         return f"{self.name}: peak={self.peak} usage={self.size} cap={self.capacity}"
