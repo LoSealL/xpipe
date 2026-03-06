@@ -88,21 +88,24 @@ def main() -> None:
     dma_bw = args.dma_bandwidth  # B/cycle
     dma_overhead = args.dma_zero_overhead  # cycles
     if args.xpipe:
-        graph, mem = npu_mlir.from_mlir(args.xpipe)
+        ir = args.xpipe
+        graph, mem = npu_mlir.from_mlir(ir)
         dma_pipeline = npu_mlir.DmaPipeline(
             "dma", bandwidth=dma_bw, zero_overhead=dma_overhead
         )
         dpu_pipeline = npu_mlir.DpuPipeline("dpu")
         dsp_pipeline = npu_mlir.DspPipeline("dsp")
     elif args.nbperf:
-        graph, mem = nbperf.from_nbperf(args.nbperf)
+        ir = args.nbperf
+        graph, mem = nbperf.from_nbperf(ir)
         dma_pipeline = nbperf.DmaPipeline(
             "dma", bandwidth=dma_bw, zero_overhead=dma_overhead
         )
         dpu_pipeline = nbperf.DpuPipeline("dpu", mac=4096)
         dsp_pipeline = nbperf.DspPipeline("dsp")
     elif args.xe:
-        graph, mem = xe.from_xe_graph(args.xe)
+        ir = args.xe
+        graph, mem = xe.from_xe_graph(ir)
         dma_pipeline = None
         dpu_pipeline = xe.GpuPipeline("xe")
         dsp_pipeline = xe.CpuPipeline("cpu")
@@ -146,16 +149,19 @@ def main() -> None:
         allocator = BestFitAllocator()
         allocator.alloc(graph)
     endtime = system.run(CostModelExecutor(graph))
-    print(f"Total execution time: {endtime:.6f} us")
+    print(f"Total execution time: {endtime} cycles")
     if args.output_trace:
         args.output_trace.parent.mkdir(parents=True, exist_ok=True)
         system.dump(args.output_trace.with_suffix(".json"))
+        output_viz = Path(args.output_trace)
+    else:
+        output_viz = Path(ir)
     if args.save_onnx:
         onnx_graph = graph.to_onnx()
-        onnx.save_model(onnx_graph, args.output_trace.with_suffix(".onnx"))
+        onnx.save_model(onnx_graph, output_viz.with_suffix(".onnx"))
     if args.save_dot:
         dot_str = to_dot(graph)
-        args.output_trace.with_suffix(".dot").write_text(dot_str)
+        output_viz.with_suffix(".dot").write_text(dot_str, encoding="utf-8")
 
 
 if __name__ == "__main__":

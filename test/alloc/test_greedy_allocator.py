@@ -72,11 +72,10 @@ def test_allocate_greedy(mlir_graph_file, remove_const_dma):
     for op, end_time in sys.step(CostModelExecutor(g)):
         if mem["CMX"].peak < mem["CMX"].size:
             print(f"{op} @ {end_time}: bad alloc")
-            ref = [mem["CMX"]._alloc_map[r] for r in mem["CMX"]._ref]
-            # check overlap
-
-            for i, b1 in enumerate(ref):
-                for j, b2 in enumerate(ref[i + 1 :], start=i + 1):
-                    if b1.addr < b2.addr + b2.size and b2.addr < b1.addr + b1.size:
-                        overlaps.append((b1, b2))
+        ref = [mem["CMX"]._alloc_map[r] for r in mem["CMX"]._ref if mem["CMX"]._ref[r]]
+        # check overlap
+        for i, b1 in enumerate(ref):
+            for j, b2 in enumerate(ref[i + 1 :], start=i + 1):
+                if b1.addr < b2.addr + b2.size and b2.addr < b1.addr + b1.size:
+                    overlaps.append((b1, b2))
     assert len(overlaps) == 0, f"Overlapping buffers: {overlaps}"

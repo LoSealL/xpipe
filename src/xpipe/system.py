@@ -196,7 +196,7 @@ class System:
                 return pipe
         raise KeyError(f"Pipeline named {key} not found in the system.")
 
-    def run(self, executor: BaseExecutor) -> float:
+    def run(self, executor: BaseExecutor) -> int:
         """Simulate all operations from pipelines by the given executor,
         and return the total execution time.
 
@@ -255,6 +255,21 @@ class System:
                         self._rec.record_dependency(dep, op)
                     yield op, end_time
             if not op_times:
+                # No op was executed at this timestamp. To avoid terminating
+                # early when there is an idle gap before the next op starts,
+                # advance time to the earliest pending start_cycle, if any.
+                next_start: Optional[int] = None
+                for pipe in pipelines:
+                    # Try common attributes for the internal op queue without
+                    # assuming a specific Pipeline API.
+                    next_op = pipe[0] if len(pipe) > 0 else None
+                    if next_op is None:
+                        continue
+                    start = next_op.start_cycle
+                    if start > ts and (next_start is None or start < next_start):
+                        next_start = start
+                if next_start is not None:
+                    heappush(next_timestamp, next_start)
                 continue
             for end_time in set(i[-1] for i in op_times):
                 heappush(next_timestamp, end_time)

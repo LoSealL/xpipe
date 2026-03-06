@@ -193,11 +193,6 @@ def _append_io(
         mem_id = op_io["id"]
         kind = op_io["loc"]
         shapes = op_io["shapes"]
-        offsets = op_io["offsets"]
-        if offsets:
-            shapes.clear()
-            for shape, offset in zip(shapes, offsets):
-                shapes.append([s - o for s, o in zip(shape, offset)])
         size = sum(math.prod(shape) for shape in shapes)
         if op_io["dtype"] in ("f16", "i16", "ui16", "si16"):
             size *= 2
