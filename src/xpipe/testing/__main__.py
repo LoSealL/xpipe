@@ -23,6 +23,7 @@ from xpipe import (
     CostModelExecutor,
     HEFTScheduler,
     PEFTScheduler,
+    Pipeline,
     RoundRobinScheduler,
     System,
 )
@@ -68,7 +69,6 @@ def _parse_args():
     parser.add_argument(
         "--output-trace",
         "-o",
-        required=True,
         type=Path,
         help="Path to output execution trace .json file",
     )
@@ -109,7 +109,7 @@ def main() -> None:
     else:
         raise RuntimeError
 
-    pipelines = []
+    pipelines: list[Pipeline] = []
     if dma_pipeline is not None:
         pipelines.append(dma_pipeline)
     if dpu_pipeline is not None:
@@ -147,10 +147,9 @@ def main() -> None:
         allocator.alloc(graph)
     endtime = system.run(CostModelExecutor(graph))
     print(f"Total execution time: {endtime:.6f} us")
-    # system.replay()
-    args.output_trace.parent.mkdir(parents=True, exist_ok=True)
-    system.dump(args.output_trace.with_suffix(".json"))
-
+    if args.output_trace:
+        args.output_trace.parent.mkdir(parents=True, exist_ok=True)
+        system.dump(args.output_trace.with_suffix(".json"))
     if args.save_onnx:
         onnx_graph = graph.to_onnx()
         onnx.save_model(onnx_graph, args.output_trace.with_suffix(".onnx"))

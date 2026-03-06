@@ -47,15 +47,15 @@ class BaseOp(metaclass=ABCMeta):
         """Start cycle of this operator in the schedule."""
         return self._beg
 
-    @property
-    def end_cycle(self) -> int:
-        """End cycle of this operator in the schedule."""
-        return int(self._end)
-
     @start_cycle.setter
     def start_cycle(self, ts: int) -> None:
         """Set the start cycle for this operator."""
         self._beg = ts
+
+    @property
+    def end_cycle(self) -> int:
+        """End cycle of this operator in the schedule."""
+        return int(self._end)
 
     @end_cycle.setter
     def end_cycle(self, ts: int) -> None:

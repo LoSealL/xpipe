@@ -9,14 +9,11 @@ description = ""
 requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
-    "json5>=0.13.0",
     "loguru>=0.7.3",
     "networkx>=3.6.1",
     "numpy<2.4.0",
     "onnx>=1.20.1",
     "perfetto>=0.16.0",
-    "triton-windows>=3.5.1.post24 ; sys_platform == 'win32'",
-    "triton>=3.5.1 ; sys_platform != 'win32'",
 ]
 
 [tool.uv.sources]
@@ -30,7 +27,12 @@ url = "https://download.pytorch.org/whl/cu129"
 explicit = true
 
 [dependency-groups]
-dev = ["pyreadline3>=3.5.4", "pyright>=1.1.408", "pytest>=9.0.2"]
+dev = [
+    "pyreadline3>=3.5.4",
+    "pyright>=1.1.408",
+    "pytest>=9.0.2",
+    "viztracer>=1.1.1",
+]
 
 [tool.pyright]
 include = ["src"]

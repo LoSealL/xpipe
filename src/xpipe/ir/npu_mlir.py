@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import json
 import math
 import os
 from collections import defaultdict
 
-import json5
 import networkx as nx
 from loguru import logger
 
@@ -109,7 +109,7 @@ def json_to_digraph(json_data: dict):
         ValueError: If any node is missing required fields (inputs or outputs)
     """
 
-    graph = nx.DiGraph()
+    graph: nx.DiGraph = nx.DiGraph()
     # output memory id to producing node ids (allow many nodes to a same memory)
     output_memory_map: dict[int, set[int]] = defaultdict(set)
     for item in json_data:
@@ -166,7 +166,7 @@ def assign_ir_to_graph(mlir_dag: nx.DiGraph, node_ir: list[dict]):
         dict[int, list[dict]]: A mapping from nodeGraph ID to all related IR nodes.
     """
 
-    trie: PrefixTree[dict] = PrefixTree().build(node_ir)
+    trie: PrefixTree[dict] = PrefixTree[dict]().build(node_ir)
     ir_mapping: dict[int, int] = {}
     for i in mlir_dag:
         node = mlir_dag.nodes[i]
@@ -192,7 +192,13 @@ def _append_io(
     for _, op_io in enumerate(args):
         mem_id = op_io["id"]
         kind = op_io["loc"]
-        size = sum(math.prod(shape) for shape in op_io["shapes"])
+        shapes = op_io["shapes"]
+        offsets = op_io["offsets"]
+        if offsets:
+            shapes.clear()
+            for shape, offset in zip(shapes, offsets):
+                shapes.append([s - o for s, o in zip(shape, offset)])
+        size = sum(math.prod(shape) for shape in shapes)
         if op_io["dtype"] in ("f16", "i16", "ui16", "si16"):
             size *= 2
         elif op_io["dtype"] in ("ui32", "si32", "i32"):
@@ -241,7 +247,7 @@ def from_mlir(
         MemorySystem: The list of memory slices used in the graph.
     """
     with open(mlir_graph, encoding="utf-8") as f:
-        mlir_db = json5.load(f, allow_duplicate_keys=False)
+        mlir_db = json.load(f)
     mlir_dag = json_to_digraph(mlir_db["nodeGraph"])
     n_cmx = query_num_clusters(mlir_dag)
     logger.info(f"Parsed {len(mlir_dag)} nodes from MLIR, using {n_cmx} clusters.")

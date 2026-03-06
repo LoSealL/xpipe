@@ -71,7 +71,7 @@ class OpGraph(nx.DiGraph, Generic[T]):
     def predecessors(self, n: Any) -> Iterator[T]:
         yield from super().predecessors(n)
 
-    def __getitem__(  # pyright: ignore
+    def __getitem__(  # type: ignore
         self,
         n: str,
     ) -> T:

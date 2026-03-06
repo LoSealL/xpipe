@@ -115,7 +115,7 @@ class BeamSearchAllocator(GreedyAllocator):
         ]
 
         for idx, (start, end, _, size) in enumerate(intervals):
-            expanded = []
+            expanded: list[State] = []
             for state in states:
                 active = list(state["active"])
                 free = list(state["free"])

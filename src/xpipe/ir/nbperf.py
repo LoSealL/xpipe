@@ -86,7 +86,7 @@ class DPUOp(BaseOp):
     def _elewise_mac(self) -> int:
         """Calculate MACs for element-wise operation."""
 
-        data_shape = {}
+        data_shape: dict[str, int] = {}
         for data in self["params"]["inputs"]:
             curr_shape = {
                 o: data["pitch"][i] for i, o in enumerate(list(data["order"]))
@@ -291,7 +291,7 @@ def from_nbperf(nb_graph: str | os.PathLike) -> tuple[OpGraph, MemorySystem]:
                 f"Error when processing node {node_name} id {node_id}"
             ) from ex
 
-    graph = OpGraph()
+    graph: OpGraph[BaseOp] = OpGraph()
     graph.add_nodes_from(tasks)
     assert len(graph) == len(tasks) == nbir["total_tasks"]
 
