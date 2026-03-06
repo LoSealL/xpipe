@@ -29,10 +29,10 @@ class BaseExecutor(metaclass=ABCMeta):
 
     def __init__(self, graph: OpGraph):
         self.graph = graph
-        self._ts: float = -1
+        self._ts: int = -1
 
     @abstractmethod
-    def execute(self, op: BaseOp) -> float:
+    def execute(self, op: BaseOp) -> int:
         """Basically the latency of the op.
 
         Returns:
@@ -42,9 +42,11 @@ class BaseExecutor(metaclass=ABCMeta):
 
     def is_ready(self, op: BaseOp) -> bool:
         """Check whether the op is ready for execution."""
-        return all([p.end_time <= self._ts for p in self.graph.pred[op]])
+        prev_ready = all([p.end_cycle <= self._ts for p in self.graph.pred[op]])
+        self_ready = op.start_cycle <= self._ts
+        return prev_ready and self_ready
 
-    def step(self, timestamp: float):
+    def step(self, timestamp: int):
         """Step into a new timestamp."""
         assert timestamp >= self._ts
         self._ts = timestamp
@@ -53,19 +55,19 @@ class BaseExecutor(metaclass=ABCMeta):
 class EasyExecutor(BaseExecutor):
     """A very easy executor that gives a fixed latency for all operators"""
 
-    def __init__(self, graph: OpGraph, interval: float = 2):
+    def __init__(self, graph: OpGraph, interval: int = 2):
         super().__init__(graph)
         self._int = interval
 
-    def execute(self, op: BaseOp) -> float:
-        op.start_time = self._ts
-        op.end_time = self._ts + self._int
-        print(f"{op.name}: {op.start_time} -> {op.end_time}")
-        return op.end_time
+    def execute(self, op: BaseOp) -> int:
+        op.start_cycle = self._ts
+        op.end_cycle = self._ts + self._int
+        print(f"{op.name}: {op.start_cycle} -> {op.end_cycle}")
+        return op.end_cycle
 
 
 class CostModelExecutor(BaseExecutor):
     """An executor based on cost model estimation."""
 
-    def execute(self, op: BaseOp) -> float:
-        return op.end_time
+    def execute(self, op: BaseOp) -> int:
+        return op.end_cycle

@@ -38,29 +38,17 @@ class MLIRModel(CostModel):
         cost = scale * op["cost"]  # cost from VPUCostModel
 
     DSP cost is modeled as a constant.
-
-    Args:
-        dma_scaling (float): scaling factor to DMA cost.
-        dpu_scaling (float): scaling factor to DPU cost.
     """
 
-    def __init__(self, dma_scaling: float = 10, dpu_scaling: float = 10) -> None:
-        self.dma_scaling = dma_scaling
-        self.dpu_scaling = dpu_scaling
-
-    def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> float:
+    def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> int:
         if isinstance(op, DMAOp):
             assert isinstance(pipe, DmaPipeline)
             size = op.inputs[0].size
-            scale = self.dma_scaling
-            return (size / pipe.bandwidth + pipe.overhead) * scale * 1e6
+            return (size + pipe.bandwidth - 1) // pipe.bandwidth + pipe.overhead
         elif isinstance(op, DPUOp):
             assert isinstance(pipe, DpuPipeline)
-            # DPU cost model: cost = flops / throughput
-            scale = self.dpu_scaling
-            return op["cost"] * scale * 1e-3  # us
+            return int(op["cost"])
         elif isinstance(op, SHAVEOp):
-            # SHAVE cost model: cost = cycles / frequency
             return 10
         else:
             raise ValueError(f"Unsupported operation type: {type(op)}")

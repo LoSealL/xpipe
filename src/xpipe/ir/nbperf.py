@@ -41,7 +41,7 @@ class DPUOp(BaseOp):
             return self._elewise_mac()
         return 0
 
-    def read_latency(self) -> float:
+    def read_latency(self) -> int:
         """Estimate the read latency of this DPU operation in cycles."""
 
         return 0
@@ -86,7 +86,7 @@ class DPUOp(BaseOp):
     def _elewise_mac(self) -> int:
         """Calculate MACs for element-wise operation."""
 
-        data_shape = {}
+        data_shape: dict[str, int] = {}
         for data in self["params"]["inputs"]:
             curr_shape = {
                 o: data["pitch"][i] for i, o in enumerate(list(data["order"]))
@@ -140,13 +140,11 @@ class DmaPipeline(Pipeline[DMAOp]):
 
     Args:
         name (str): The name of the pipeline.
-        bandwidth (float): The bandwidth of the DMA pipeline in bytes/s.
-        zero_overhead (float): The fixed overhead time in s for each DMA operation.
+        bandwidth (int): The transaction byte per cycle of the DMA pipeline.
+        zero_overhead (int): The fixed overhead time in cycles for each DMA operation.
     """
 
-    def __init__(
-        self, name: str = "dma", bandwidth: float = 1, zero_overhead: float = 0
-    ):
+    def __init__(self, name: str = "dma", bandwidth: int = 1, zero_overhead: int = 0):
         super().__init__(name)
         self.bandwidth = bandwidth
         self.overhead = zero_overhead
@@ -161,10 +159,10 @@ class DpuPipeline(Pipeline[DPUOp]):
 
     Args:
         name (str): The name of the pipeline.
-        mac (float): The number of MAC operations per second.
+        mac (int): The number of MAC operations per cycle.
     """
 
-    def __init__(self, name: str = "dpu", mac: float = 1):
+    def __init__(self, name: str = "dpu", mac: int = 4096):
         super().__init__(name)
         self.mac = mac
 
@@ -293,7 +291,7 @@ def from_nbperf(nb_graph: str | os.PathLike) -> tuple[OpGraph, MemorySystem]:
                 f"Error when processing node {node_name} id {node_id}"
             ) from ex
 
-    graph = OpGraph()
+    graph: OpGraph[BaseOp] = OpGraph()
     graph.add_nodes_from(tasks)
     assert len(graph) == len(tasks) == nbir["total_tasks"]
 

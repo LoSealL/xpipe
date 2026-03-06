@@ -1,5 +1,5 @@
 ---
-description: I explains the structure of Xe dumped graph (XeGraph), which is a desription file in JSON format.
+description: I explains the structure of Xe dumped graph (XeGraph), which is a description file in JSON format.
 applyTo: Implement functions/methods related to "XE" or "Xe Graph".
 ---
 
@@ -74,7 +74,7 @@ Kernels represent Xe (GPU) kernel details.
   "output_layouts": ["bfyx"]
 }
 ```
-"input" ("output") is a flag to show if this kernel is input (output). "input_name" show which input this kernel uses. "id" is the name from original network. "unique_id" is a unique name for kernel. "entry" is the name of entry function. "domain" is an optional string to identify entry functions. "group_size" and "local_size" are launch parameters. "arguments" are a list of argument object. "depends" are a list of depedent kernel names. "barrier" is a flag to show whether to insert barrier after this kernel. "output_layouts" is a debug info.
+"input" ("output") is a flag to show if this kernel is input (output). "input_name" show which input this kernel uses. "id" is the name from original network. "unique_id" is a unique name for kernel. "entry" is the name of entry function. "domain" is an optional string to identify entry functions. "group_size" and "local_size" are launch parameters. "arguments" are a list of argument object. "depends" are a list of dependent kernel names. "barrier" is a flag to show whether to insert barrier after this kernel. "output_layouts" is a debug info.
 
 #### Argument
 Argument represent details for kernel argument.

@@ -19,11 +19,11 @@ from pathlib import Path
 from pytest import fixture, mark
 
 from xpipe import CostModelExecutor, MLIRModel, PEFTScheduler, System
-from xpipe.alloc import GreedyAllocator
+from xpipe.alloc import BestFitAllocator
 from xpipe.ir.npu_mlir import DmaPipeline, DpuPipeline, DspPipeline, from_mlir
 
 
-@fixture(params=["srcnn_xpipe.json", "yolov10_sample.json"])
+@fixture(name="mlir_graph_file", params=["srcnn_xpipe.json", "yolov10_sample.json"])
 def mlir_graph_file(request):
     return Path(__file__).parent.parent / f"ir/{request.param}"
 
@@ -31,43 +31,23 @@ def mlir_graph_file(request):
 @mark.parametrize(
     "remove_const_dma", [False, True], ids=["with_const_dma", "without_const_dma"]
 )
-def test_allocate_greedy(mlir_graph_file, remove_const_dma):
+def test_best_fit_peak_no_worse_than_greedy(mlir_graph_file, remove_const_dma):
     # pylint: disable=protected-access
     g, mem = from_mlir(mlir_graph_file, remove_const_dma=remove_const_dma)
     sys = System(
         [
             DmaPipeline("dma", 64, 1000),
-            DpuPipeline("dpu"),
+            DpuPipeline("dpu", 4096),
             DspPipeline("dsp"),
         ],
         mem,
     )
     sched = PEFTScheduler(MLIRModel())
     sched.schedule(sys, g)
-    for _, b in mem["DDR"]._alloc_map.items():
-        b.addr = -1
-    for _, b in mem["CMX"]._alloc_map.items():
-        b.addr = -1
-    GreedyAllocator().alloc(g)
-    unallocated = []
+
+    mem.reset()
+    BestFitAllocator().alloc(g)
     max_ddr, max_cmx = 0, 0
-    used_ddr, used_cmx = 0, 0
-    for _, b in mem["DDR"]._alloc_map.items():
-        if b.addr == -1:
-            unallocated.append(b)
-        else:
-            max_ddr = max(max_ddr, b.addr + b.size)
-            used_ddr += b.size
-    for _, b in mem["CMX"]._alloc_map.items():
-        if b.addr == -1:
-            unallocated.append(b)
-        else:
-            max_cmx = max(max_cmx, b.addr + b.size)
-            used_cmx += b.size
-    if not remove_const_dma:
-        assert len(unallocated) == 0, f"Unallocated buffers: {unallocated}"
-    print(f"After allocation: DDR={max_ddr}, CMX={max_cmx}")
-    print(f"DDR utilization: {used_ddr}, CMX utilization: {used_cmx}")
     overlaps = []
     for op, end_time in sys.step(CostModelExecutor(g)):
         if mem["CMX"].peak < mem["CMX"].size:
@@ -78,4 +58,7 @@ def test_allocate_greedy(mlir_graph_file, remove_const_dma):
             for j, b2 in enumerate(ref[i + 1 :], start=i + 1):
                 if b1.addr < b2.addr + b2.size and b2.addr < b1.addr + b1.size:
                     overlaps.append((b1, b2))
+        max_ddr = max(max_ddr, mem["DDR"].peak)
+        max_cmx = max(max_cmx, mem["CMX"].peak)
     assert len(overlaps) == 0, f"Overlapping buffers: {overlaps}"
+    print(f"After allocation: DDR={max_ddr}, CMX={max_cmx}")

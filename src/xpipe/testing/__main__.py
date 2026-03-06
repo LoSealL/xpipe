@@ -23,12 +23,14 @@ from xpipe import (
     CostModelExecutor,
     HEFTScheduler,
     PEFTScheduler,
+    Pipeline,
     RoundRobinScheduler,
     System,
 )
-from xpipe.alloc import GreedyAllocator
+from xpipe.alloc import BeamSearchAllocator, BestFitAllocator, GreedyAllocator
 from xpipe.cost import DummyCostModel, MLIRModel, NBPerfMathModel, XeModel
 from xpipe.ir import nbperf, npu_mlir, xe
+from xpipe.ir.utils import to_dot
 
 
 def _parse_args():
@@ -40,7 +42,10 @@ def _parse_args():
     ir.add_argument("--nbperf", "-nb", help="Path to NBPerf .json file")
     ir.add_argument("--xe", "-xe", help="Path to Xe dumped graph .json file")
     parser.add_argument(
-        "--allocator", "-a", choices=["greedy", "vpurt"], default="greedy"
+        "--allocator",
+        "-a",
+        choices=["greedy", "beam_search", "best_fit", "by_ir"],
+        default="greedy",
     )
     parser.add_argument(
         "--scheduler", "-s", choices=["heft", "peft", "robin"], default="peft"
@@ -48,15 +53,15 @@ def _parse_args():
     parser.add_argument(
         "--dma-bandwidth",
         "-bw",
-        type=float,
-        default=64.0,
-        help="DMA bandwidth in GB/s",
+        type=int,
+        default=64,
+        help="DMA bandwidth in B/cycle",
     )
     parser.add_argument(
         "--dma-zero-overhead",
-        type=float,
-        default=1.0,
-        help="DMA overhead in useconds when transferring zero bytes",
+        type=int,
+        default=1000,
+        help="DMA overhead in cycles when transferring zero bytes",
     )
     parser.add_argument(
         "--dummy-cost-model", action="store_true", help="Use a dummy cost model"
@@ -64,12 +69,14 @@ def _parse_args():
     parser.add_argument(
         "--output-trace",
         "-o",
-        required=True,
         type=Path,
         help="Path to output execution trace .json file",
     )
     parser.add_argument(
         "--save-onnx", action="store_true", help="Save the scheduled graph as ONNX"
+    )
+    parser.add_argument(
+        "--save-dot", action="store_true", help="Save the scheduled graph as DOT"
     )
     parser.add_argument("-v", action="store_true", help="Enable verbose logging")
 
@@ -78,31 +85,34 @@ def _parse_args():
 
 def main() -> None:
     args = _parse_args()
-    dma_bw = args.dma_bandwidth * 1e9  # GB/s to B/s
-    dma_overhead = args.dma_zero_overhead * 1e-6  # us to s
+    dma_bw = args.dma_bandwidth  # B/cycle
+    dma_overhead = args.dma_zero_overhead  # cycles
     if args.xpipe:
-        graph, mem = npu_mlir.from_mlir(args.xpipe)
+        ir = args.xpipe
+        graph, mem = npu_mlir.from_mlir(ir)
         dma_pipeline = npu_mlir.DmaPipeline(
             "dma", bandwidth=dma_bw, zero_overhead=dma_overhead
         )
         dpu_pipeline = npu_mlir.DpuPipeline("dpu")
         dsp_pipeline = npu_mlir.DspPipeline("dsp")
     elif args.nbperf:
-        graph, mem = nbperf.from_nbperf(args.nbperf)
+        ir = args.nbperf
+        graph, mem = nbperf.from_nbperf(ir)
         dma_pipeline = nbperf.DmaPipeline(
             "dma", bandwidth=dma_bw, zero_overhead=dma_overhead
         )
         dpu_pipeline = nbperf.DpuPipeline("dpu", mac=4096)
         dsp_pipeline = nbperf.DspPipeline("dsp")
     elif args.xe:
-        graph, mem = xe.from_xe_graph(args.xe)
+        ir = args.xe
+        graph, mem = xe.from_xe_graph(ir)
         dma_pipeline = None
         dpu_pipeline = xe.GpuPipeline("xe")
         dsp_pipeline = xe.CpuPipeline("cpu")
     else:
         raise RuntimeError
 
-    pipelines = []
+    pipelines: list[Pipeline] = []
     if dma_pipeline is not None:
         pipelines.append(dma_pipeline)
     if dpu_pipeline is not None:
@@ -132,14 +142,26 @@ def main() -> None:
     if args.allocator == "greedy":
         allocator = GreedyAllocator()
         allocator.alloc(graph)
+    elif args.allocator == "beam_search":
+        allocator = BeamSearchAllocator(beam_width=16, candidate_limit=8)
+        allocator.alloc(graph)
+    elif args.allocator == "best_fit":
+        allocator = BestFitAllocator()
+        allocator.alloc(graph)
     endtime = system.run(CostModelExecutor(graph))
-    print(f"Total execution time: {endtime:.6f} us")
-    args.output_trace.parent.mkdir(parents=True, exist_ok=True)
-    system.dump(args.output_trace.with_suffix(".json"))
-
+    print(f"Total execution time: {endtime} cycles")
+    if args.output_trace:
+        args.output_trace.parent.mkdir(parents=True, exist_ok=True)
+        system.dump(args.output_trace.with_suffix(".json"))
+        output_viz = Path(args.output_trace)
+    else:
+        output_viz = Path(ir)
     if args.save_onnx:
         onnx_graph = graph.to_onnx()
-        onnx.save_model(onnx_graph, args.output_trace.with_suffix(".onnx"))
+        onnx.save_model(onnx_graph, output_viz.with_suffix(".onnx"))
+    if args.save_dot:
+        dot_str = to_dot(graph)
+        output_viz.with_suffix(".dot").write_text(dot_str, encoding="utf-8")
 
 
 if __name__ == "__main__":

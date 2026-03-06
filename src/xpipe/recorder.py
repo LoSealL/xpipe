@@ -124,6 +124,14 @@ class CatapultRecorder:
                 args={"name": cat + "_thread"},
             )
 
+    def reset(self):
+        """Reset the recorder by clearing all recorded events and metadata."""
+
+        self._events.clear()
+        self._proc.clear()
+        self._thread.clear()
+        self._op2cat.clear()
+
     def record(self, cat: str, op: BaseOp):
         """Record the begin and end event (which combines a complete event)
         on the op."""
@@ -136,8 +144,8 @@ class CatapultRecorder:
         self._events[op.name] = CompleteEvent(
             name=name,
             cat=op.type,
-            ts=op.start_time,
-            dur=op.end_time - op.start_time,
+            ts=op.start_cycle,
+            dur=op.end_cycle - op.start_cycle,
             pid=self._proc[cat].pid,
             tid=self._thread[cat].tid,
             args={k: str(v) for k, v in op.attr.items()},
@@ -177,7 +185,7 @@ class CatapultRecorder:
         self._events[name + ":b"] = FlowStartEvent(
             name=name,
             cat="flow",
-            ts=(src.start_time + src.end_time) // 2,
+            ts=(src.start_cycle + src.end_cycle) // 2,
             pid=self._proc[csrc].pid,
             tid=self._thread[csrc].tid,
             id=hash_id,
@@ -185,7 +193,7 @@ class CatapultRecorder:
         self._events[name + ":e"] = FlowFinishEvent(
             name=name,
             cat="flow",
-            ts=(dst.start_time + dst.end_time) // 2,
+            ts=(dst.start_cycle + dst.end_cycle) // 2,
             pid=self._proc[cdst].pid,
             tid=self._thread[cdst].tid,
             id=hash_id,

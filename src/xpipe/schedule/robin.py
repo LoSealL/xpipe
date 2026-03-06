@@ -25,6 +25,31 @@ from . import Scheduler
 class RoundRobinScheduler(Scheduler):
     """A simple Round Robin scheduler."""
 
+    @staticmethod
+    def _dep_ready_time(op: BaseOp, pipe: Pipeline, graph: OpGraph) -> int:
+        """Compute when all dependencies of ``op`` are ready on ``pipe``."""
+
+        dep_ready = 0
+        for dep in op.deps:
+            comm = graph.get_edge_data(dep, op, {}).get("comm", 0)
+            ready = dep.end_cycle + (comm if dep not in pipe else 0)
+            dep_ready = max(dep_ready, ready)
+        return dep_ready
+
+    @staticmethod
+    def _next_compatible_pipe(
+        pipelines: list[Pipeline], op: BaseOp, start_index: int
+    ) -> tuple[Pipeline, int]:
+        """Pick the next compatible pipeline in round-robin order."""
+
+        pipe_count = len(pipelines)
+        for step in range(pipe_count):
+            idx = (start_index + step) % pipe_count
+            pipe = pipelines[idx]
+            if pipe.is_compatible(op):
+                return pipe, idx
+        raise ValueError(f"No compatible pipeline found for operator {op.name}.")
+
     def schedule(self, system: System, graph: OpGraph):
         """Schedule the operators in the graph onto the pipelines in the system.
 
@@ -36,18 +61,24 @@ class RoundRobinScheduler(Scheduler):
             dict: A mapping from operator to assigned pipeline.
         """
 
-        end_times = {pipe: 0.0 for pipe in system.pipelines}
+        pipelines = list(system.pipelines)
+        if not pipelines:
+            raise ValueError("System has no pipelines to schedule operators.")
+
+        end_times = {pipe: 0 for pipe in pipelines}
+        next_pipe_index = 0
         for op in nx.topological_sort(graph):
             assert isinstance(op, BaseOp)
-            best_pipe: Pipeline | None = None
-            for pipe in system.pipelines:
-                if not pipe.is_compatible(op):
-                    continue
-                if best_pipe is None or len(pipe) < len(best_pipe):
-                    best_pipe = pipe
-            assert best_pipe is not None
-            op.start_time = end_times[best_pipe]
-            op.end_time = op.start_time + self.get_cost(op, best_pipe)
-            logger.debug(f"schedule {op} on {best_pipe}")
-            best_pipe.push(op)
-            end_times[best_pipe] = op.end_time
+            pipe, used_index = self._next_compatible_pipe(
+                pipelines, op, next_pipe_index
+            )
+            dep_ready = self._dep_ready_time(op, pipe, graph)
+            pipe_ready = end_times[pipe]
+            start = max(dep_ready, pipe_ready)
+            end = start + int(self.get_cost(op, pipe))
+            op.start_cycle = start
+            op.end_cycle = end
+            logger.debug(f"schedule {op} on {pipe}")
+            pipe.push(op)
+            end_times[pipe] = end
+            next_pipe_index = (used_index + 1) % len(pipelines)

@@ -43,7 +43,7 @@ class PEFTScheduler(HEFTScheduler):
         ops: list[BaseOp] = sorted(graph.nodes, key=lambda op: op["rank"], reverse=True)
         for op in ops:
             best_pipe: Pipeline | None = None
-            best_eft = float("inf")
+            best_eft = 0
             min_oeft = float("inf")
             for pipe in system.pipelines:
                 if not pipe.is_compatible(op):
@@ -56,8 +56,8 @@ class PEFTScheduler(HEFTScheduler):
                     best_pipe = pipe
                     best_eft = eft
             assert best_pipe is not None
-            op.start_time = best_eft - self.get_cost(op, best_pipe)
-            op.end_time = best_eft
+            op.start_cycle = best_eft - self.get_cost(op, best_pipe)
+            op.end_cycle = best_eft
             logger.debug(f"schedule {op} on {best_pipe}")
             best_pipe.push(op)
 

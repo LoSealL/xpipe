@@ -94,7 +94,7 @@ def _build_graph():
             "T10": [13, 16, 33],
         }
 
-        def cost(self, op: BaseOp, pipe: Pipeline | None = None) -> float:
+        def cost(self, op: BaseOp, pipe: Pipeline | None = None) -> int:
             assert pipe is not None
             pipe_id = int(pipe.name[1:]) - 1
             return self._lut[op.name][pipe_id]
@@ -121,4 +121,4 @@ def test_heft_scheduler():
     assert len(system["P1"]) == 3
     assert len(system["P2"]) == 4
     assert len(system["P3"]) == 3
-    assert graph["T10"].end_time == 133
+    assert graph["T10"].end_cycle == 133

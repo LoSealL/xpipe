@@ -26,7 +26,7 @@ class CostModel(metaclass=ABCMeta):
     r"""A base cost model for estimating operation costs."""
 
     @abstractmethod
-    def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> float:
+    def cost(self, op: BaseOp, pipe: Optional[Pipeline] = None) -> int:
         """Estimate the cost of an operator.
 
         Args:
@@ -34,7 +34,7 @@ class CostModel(metaclass=ABCMeta):
             pipe (Optional[Pipeline]): The pipeline on which the operator will run.
 
         Returns:
-            float: The estimated cost of the operator.
+            int: The estimated cost of the operator.
         """
 
     @lru_cache(maxsize=1024, typed=True)
