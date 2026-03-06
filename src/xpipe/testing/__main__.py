@@ -26,9 +26,10 @@ from xpipe import (
     RoundRobinScheduler,
     System,
 )
-from xpipe.alloc import GreedyAllocator
+from xpipe.alloc import BeamSearchAllocator, BestFitAllocator, GreedyAllocator
 from xpipe.cost import DummyCostModel, MLIRModel, NBPerfMathModel, XeModel
 from xpipe.ir import nbperf, npu_mlir, xe
+from xpipe.ir.utils import to_dot
 
 
 def _parse_args():
@@ -40,7 +41,10 @@ def _parse_args():
     ir.add_argument("--nbperf", "-nb", help="Path to NBPerf .json file")
     ir.add_argument("--xe", "-xe", help="Path to Xe dumped graph .json file")
     parser.add_argument(
-        "--allocator", "-a", choices=["greedy", "vpurt"], default="greedy"
+        "--allocator",
+        "-a",
+        choices=["greedy", "beam_search", "best_fit", "by_ir"],
+        default="greedy",
     )
     parser.add_argument(
         "--scheduler", "-s", choices=["heft", "peft", "robin"], default="peft"
@@ -70,6 +74,9 @@ def _parse_args():
     )
     parser.add_argument(
         "--save-onnx", action="store_true", help="Save the scheduled graph as ONNX"
+    )
+    parser.add_argument(
+        "--save-dot", action="store_true", help="Save the scheduled graph as DOT"
     )
     parser.add_argument("-v", action="store_true", help="Enable verbose logging")
 
@@ -132,6 +139,12 @@ def main() -> None:
     if args.allocator == "greedy":
         allocator = GreedyAllocator()
         allocator.alloc(graph)
+    elif args.allocator == "beam_search":
+        allocator = BeamSearchAllocator(beam_width=16, candidate_limit=8)
+        allocator.alloc(graph)
+    elif args.allocator == "best_fit":
+        allocator = BestFitAllocator()
+        allocator.alloc(graph)
     endtime = system.run(CostModelExecutor(graph))
     print(f"Total execution time: {endtime:.6f} us")
     # system.replay()
@@ -141,6 +154,9 @@ def main() -> None:
     if args.save_onnx:
         onnx_graph = graph.to_onnx()
         onnx.save_model(onnx_graph, args.output_trace.with_suffix(".onnx"))
+    if args.save_dot:
+        dot_str = to_dot(graph)
+        args.output_trace.with_suffix(".dot").write_text(dot_str)
 
 
 if __name__ == "__main__":
